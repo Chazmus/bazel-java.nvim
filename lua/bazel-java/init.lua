@@ -59,9 +59,9 @@ function M.setup_jdtls(opts)
     target.init_options.extendedClientCapabilities or {},
     {
       commands = {
-        "java.bazel.syncProjects.command",
-        "java.bazel.updateClasspaths.command",
-        "java.bazel.syncDirectoriesOnly.command",
+        "java.bazel.syncProjects",
+        "java.bazel.updateClasspaths",
+        "java.bazel.syncDirectoriesOnly",
       },
     }
   )
@@ -90,7 +90,7 @@ function M.setup_jdtls(opts)
             {
               "<leader>jbs",
               function()
-                require("jdtls.util").execute_command({ command = "java.bazel.syncProjects.command" })
+                require("jdtls.util").execute_command({ command = "java.bazel.syncProjects" })
               end,
               desc = "Sync Projects",
               buffer = args.buf,
@@ -98,7 +98,7 @@ function M.setup_jdtls(opts)
             {
               "<leader>jbu",
               function()
-                require("jdtls.util").execute_command({ command = "java.bazel.updateClasspaths.command" })
+                require("jdtls.util").execute_command({ command = "java.bazel.updateClasspaths" })
               end,
               desc = "Update Classpaths",
               buffer = args.buf,
@@ -106,7 +106,7 @@ function M.setup_jdtls(opts)
             {
               "<leader>jbd",
               function()
-                require("jdtls.util").execute_command({ command = "java.bazel.syncDirectoriesOnly.command" })
+                require("jdtls.util").execute_command({ command = "java.bazel.syncDirectoriesOnly" })
               end,
               desc = "Sync Directories Only",
               buffer = args.buf,
