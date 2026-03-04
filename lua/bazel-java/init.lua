@@ -29,28 +29,34 @@ function M.get_bundles()
 end
 
 function M.setup_jdtls(opts)
+  -- Support both LazyVim (opts.jdtls) and standard nvim-jdtls (opts)
+  local target = opts.jdtls or opts
+
   -- 1. Add Bundles
-  opts.jdtls = opts.jdtls or {}
-  opts.jdtls.init_options = opts.jdtls.init_options or {}
-  opts.jdtls.init_options.bundles = opts.jdtls.init_options.bundles or {}
+  target.init_options = target.init_options or {}
+  target.init_options.bundles = target.init_options.bundles or {}
   
   local bundles = M.get_bundles()
   if #bundles == 0 then
-    vim.notify("Bazel Java JARs not found. Please run :BazelJavaInstall", vim.log.levels.WARN)
-    return
-  end
-  
-  -- Merge our bundles with any existing ones (like DAP/Test)
-  for _, bundle in ipairs(bundles) do
-    if not vim.tbl_contains(opts.jdtls.init_options.bundles, bundle) then
-      table.insert(opts.jdtls.init_options.bundles, bundle)
+    -- Only notify if we are likely in a Java file within a Bazel project
+    local markers = { "WORKSPACE", "MODULE.bazel", "BUILD.bazel", "BUILD" }
+    local is_bazel = #vim.fs.find(markers, { upward = true, stop = vim.uv.os_homedir() }) > 0
+    if is_bazel and vim.bo.filetype == "java" then
+      vim.notify("Bazel Java JARs not found. Please run :BazelJavaInstall", vim.log.levels.WARN)
+    end
+  else
+    -- Merge our bundles with any existing ones (like DAP/Test)
+    for _, bundle in ipairs(bundles) do
+      if not vim.tbl_contains(target.init_options.bundles, bundle) then
+        table.insert(target.init_options.bundles, bundle)
+      end
     end
   end
 
   -- 2. Register Bazel Commands
-  opts.jdtls.init_options.extendedClientCapabilities = vim.tbl_deep_extend(
+  target.init_options.extendedClientCapabilities = vim.tbl_deep_extend(
     "force",
-    opts.jdtls.init_options.extendedClientCapabilities or {},
+    target.init_options.extendedClientCapabilities or {},
     {
       commands = {
         "java.bazel.syncProjects.command",
@@ -61,7 +67,7 @@ function M.setup_jdtls(opts)
   )
 
   -- 3. Bazel Settings
-  opts.settings = vim.tbl_deep_extend("force", opts.settings or {}, {
+  target.settings = vim.tbl_deep_extend("force", target.settings or {}, {
     java = {
       import = {
         bazel = { enabled = true, disabled = false },
@@ -72,46 +78,44 @@ function M.setup_jdtls(opts)
     },
   })
 
-  -- 4. Add Keymaps
-  local on_attach = opts.on_attach
-  opts.on_attach = function(args)
-    if on_attach then
-      on_attach(args)
-    end
-    local client = vim.lsp.get_client_by_id(args.data.client_id)
-    if client and client.name == "jdtls" then
-      local ok, wk = pcall(require, "which-key")
-      if ok then
-        wk.add({
-          { mode = "n", buffer = args.buf, { "<leader>jb", group = "bazel" } },
-          {
-            "<leader>jbs",
-            function()
-              require("jdtls.util").execute_command({ command = "java.bazel.syncProjects.command" })
-            end,
-            desc = "Sync Projects",
-            buffer = args.buf,
-          },
-          {
-            "<leader>jbu",
-            function()
-              require("jdtls.util").execute_command({ command = "java.bazel.updateClasspaths.command" })
-            end,
-            desc = "Update Classpaths",
-            buffer = args.buf,
-          },
-          {
-            "<leader>jbd",
-            function()
-              require("jdtls.util").execute_command({ command = "java.bazel.syncDirectoriesOnly.command" })
-            end,
-            desc = "Sync Directories Only",
-            buffer = args.buf,
-          },
-        })
+  -- 4. Add Keymaps via autocmd to avoid signature issues
+  vim.api.nvim_create_autocmd("LspAttach", {
+    callback = function(args)
+      local client = vim.lsp.get_client_by_id(args.data.client_id)
+      if client and client.name == "jdtls" then
+        local ok, wk = pcall(require, "which-key")
+        if ok then
+          wk.add({
+            { mode = "n", buffer = args.buf, { "<leader>jb", group = "bazel" } },
+            {
+              "<leader>jbs",
+              function()
+                require("jdtls.util").execute_command({ command = "java.bazel.syncProjects.command" })
+              end,
+              desc = "Sync Projects",
+              buffer = args.buf,
+            },
+            {
+              "<leader>jbu",
+              function()
+                require("jdtls.util").execute_command({ command = "java.bazel.updateClasspaths.command" })
+              end,
+              desc = "Update Classpaths",
+              buffer = args.buf,
+            },
+            {
+              "<leader>jbd",
+              function()
+                require("jdtls.util").execute_command({ command = "java.bazel.syncDirectoriesOnly.command" })
+              end,
+              desc = "Sync Directories Only",
+              buffer = args.buf,
+            },
+          })
+        end
       end
-    end
-  end
+    end,
+  })
 end
 
 return M
