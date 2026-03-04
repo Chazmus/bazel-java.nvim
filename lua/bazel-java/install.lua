@@ -15,24 +15,44 @@ function M.install()
     vim.fn.mkdir(install_dir, "p")
   end
 
-  vim.notify("Downloading Bazel Java extension...", vim.log.levels.INFO)
+  local last_percentage = -1
+  local notify_record = nil
 
-  -- Use --compressed to handle the Marketplace's gzip response
-  vim.fn.jobstart({ "curl", "-L", "--compressed", "-o", zip_file, url }, {
+  local function update_progress(percentage)
+    -- Throttle notifications to every 10% to avoid spamming
+    if percentage >= last_percentage + 10 or percentage >= 100 then
+      last_percentage = percentage
+      local msg = string.format("Downloading Bazel Java extension: %d%%", percentage)
+      -- If nvim-notify is available, it supports 'replace' to update the same notification
+      notify_record = vim.notify(msg, vim.log.levels.INFO, {
+        title = "Bazel Java",
+        replace = notify_record,
+      })
+    end
+  end
+
+  vim.notify("Starting download...", vim.log.levels.INFO, { title = "Bazel Java" })
+
+  vim.fn.jobstart({ "curl", "-L", "--compressed", "--progress-bar", "-o", zip_file, url }, {
+    on_stderr = function(_, data)
+      for _, line in ipairs(data) do
+        local p = line:match("(%d+%.?%d*)%%")
+        if p then
+          update_progress(math.floor(tonumber(p)))
+        end
+      end
+    end,
     on_exit = function(_, exit_code)
       if exit_code ~= 0 then
         vim.notify("Failed to download Bazel extension (exit code: " .. exit_code .. ")", vim.log.levels.ERROR)
         return
       end
 
-      vim.notify("Extracting extension...", vim.log.levels.INFO)
+      vim.notify("Extracting extension...", vim.log.levels.INFO, { title = "Bazel Java", replace = notify_record })
       
-      -- VS Code extensions are actually zips. They usually contain an 'extension' folder.
-      -- Unzip directly into the install_dir.
       vim.fn.jobstart({ "unzip", "-o", zip_file, "-d", install_dir }, {
         on_exit = function(_, unzip_exit_code)
           if unzip_exit_code ~= 0 then
-            -- Fallback: check if the file is actually a zip despite potential errors
             if vim.fn.isdirectory(init.server_path) == 1 then
                vim.fn.delete(zip_file)
                vim.notify("Bazel Java extension installed! (Note: unzip reported warnings)", vim.log.levels.WARN)
@@ -44,9 +64,8 @@ function M.install()
 
           vim.fn.delete(zip_file)
           
-          -- Verify the expected directory exists
           if vim.fn.isdirectory(init.server_path) == 1 then
-            vim.notify("Bazel Java extension installed successfully! Please restart Neovim.", vim.log.levels.INFO)
+            vim.notify("Bazel Java extension installed successfully! Please restart Neovim.", vim.log.levels.INFO, { title = "Bazel Java" })
           else
             vim.notify("Extraction appeared successful, but " .. init.server_path .. " was not found.", vim.log.levels.ERROR)
           end
