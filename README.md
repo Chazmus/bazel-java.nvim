@@ -1,4 +1,4 @@
-# lazy-bazel-java.nvim
+# bazel-java.nvim
 
 A Neovim plugin to automatically set up Bazel support for Java using `nvim-jdtls`. This plugin downloads the necessary JARs from the `bazel-eclipse-vscode` extension and configures `jdtls` to use them.
 
@@ -14,12 +14,12 @@ A Neovim plugin to automatically set up Bazel support for Java using `nvim-jdtls
 
 ```lua
 {
-  "your-username/lazy-bazel-java.nvim",
+  "your-username/bazel-java.nvim",
   dependencies = { "mfussenegger/nvim-jdtls" },
   opts = {},
   config = function(_, opts)
     -- This hooks into nvim-jdtls to add the Bazel bundles and settings
-    require("lazy-bazel-java").setup_jdtls(opts)
+    require("bazel-java").setup_jdtls(opts)
   end,
 }
 ```
