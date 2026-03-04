@@ -1,0 +1,20 @@
+# OS junk
+.DS_Store
+Thumbs.db
+
+# Lua/Neovim
+.nvim/
+*.log
+.luarc.json
+.stylua.toml
+
+# Java/Bazel (common)
+.project
+.classpath
+.settings/
+.idea/
+.vscode/
+bin/
+target/
+.bazel/
+bazel-*
