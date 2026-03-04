@@ -17,4 +17,7 @@ Thumbs.db
 bin/
 target/
 .bazel/
-bazel-*
+bazel-bin/
+bazel-out/
+bazel-testlogs/
+bazel-external/
