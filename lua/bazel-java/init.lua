@@ -32,6 +32,9 @@ function M.setup_jdtls(opts)
   -- Support both LazyVim (opts.jdtls) and standard nvim-jdtls (opts)
   local target = opts.jdtls or opts
 
+  local markers = { "WORKSPACE", "MODULE.bazel", "BUILD.bazel", "BUILD" }
+  local is_bazel = #vim.fs.find(markers, { upward = true, stop = vim.uv.os_homedir() }) > 0
+
   -- 1. Add Bundles
   target.init_options = target.init_options or {}
   target.init_options.bundles = target.init_options.bundles or {}
@@ -39,8 +42,6 @@ function M.setup_jdtls(opts)
   local bundles = M.get_bundles()
   if #bundles == 0 then
     -- Only notify if we are likely in a Java file within a Bazel project
-    local markers = { "WORKSPACE", "MODULE.bazel", "BUILD.bazel", "BUILD" }
-    local is_bazel = #vim.fs.find(markers, { upward = true, stop = vim.uv.os_homedir() }) > 0
     if is_bazel and vim.bo.filetype == "java" then
       vim.notify("Bazel Java JARs not found. Please run :BazelJavaInstall", vim.log.levels.WARN)
     end
@@ -67,11 +68,19 @@ function M.setup_jdtls(opts)
   )
 
   -- 3. Bazel Settings
+  local import_settings = {
+    bazel = { enabled = true, disabled = false },
+  }
+
+  if is_bazel then
+    -- Prioritize Bazel by disabling competing build systems
+    import_settings.maven = { enabled = false }
+    import_settings.gradle = { enabled = false }
+  end
+
   target.settings = vim.tbl_deep_extend("force", target.settings or {}, {
     java = {
-      import = {
-        bazel = { enabled = true, disabled = false },
-      },
+      import = import_settings,
     },
     bazel = {
       projectview = { open = true },
