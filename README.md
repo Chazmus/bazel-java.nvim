@@ -15,13 +15,14 @@ A Neovim plugin to automatically set up Bazel support for Java using `nvim-jdtls
 ```lua
 {
   "Chazmus/bazel-java.nvim",
-  dependencies = { "mfussenegger/nvim-jdtls" },
-  ft = "java",
+},
+{
+  "mfussenegger/nvim-jdtls",
+  dependencies = { "Chazmus/bazel-java.nvim" },
   opts = function(_, opts)
     require("bazel-java").setup_jdtls(opts)
   end,
 }
-```
 ```
 
 ## Setup
