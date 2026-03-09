@@ -33,7 +33,17 @@ function M.setup_jdtls(opts)
   local target = opts.jdtls or opts
 
   local markers = { "WORKSPACE", "MODULE.bazel", "BUILD.bazel", "BUILD" }
-  local is_bazel = #vim.fs.find(markers, { upward = true, stop = vim.uv.os_homedir() }) > 0
+  
+  -- Use current buffer's directory or cwd to find bazel root
+  local search_path = vim.fn.expand("%:p:h")
+  if search_path == "" or not vim.uv.fs_stat(search_path) then
+    search_path = vim.fn.getcwd()
+  end
+  local bazel_match = vim.fs.find(markers, { path = search_path, upward = true, stop = vim.uv.os_homedir() })
+  local is_bazel = #bazel_match > 0
+  local bazel_root = is_bazel and vim.fs.dirname(bazel_match[1]) or nil
+
+  vim.notify("[bazel-java] is_bazel detected as: " .. tostring(is_bazel), vim.log.levels.INFO)
 
   -- 1. Add Bundles
   target.init_options = target.init_options or {}
@@ -67,7 +77,7 @@ function M.setup_jdtls(opts)
     }
   )
 
-  -- 3. Bazel Settings
+  -- 3. Bazel Settings & Root Dir
   local import_settings = {
     bazel = { enabled = true, disabled = false },
   }
@@ -76,6 +86,29 @@ function M.setup_jdtls(opts)
     -- Prioritize Bazel by disabling competing build systems
     import_settings.maven = { enabled = false }
     import_settings.gradle = { enabled = false }
+    vim.notify("[bazel-java] Disabled Maven and Gradle imports in jdtls settings", vim.log.levels.INFO)
+
+    -- Force the root_dir to the bazel workspace to prevent jdtls from anchoring to a pom.xml
+    if bazel_root then
+      local orig_root_dir = target.root_dir
+      target.root_dir = function(path)
+        -- Still allow dynamic resolution, but prioritize bazel markers
+        local root = vim.fs.root(path, markers)
+        if root then return root end
+        if type(orig_root_dir) == "function" then
+          return orig_root_dir(path)
+        elseif orig_root_dir then
+          return orig_root_dir
+        end
+        return bazel_root
+      end
+    end
+
+    -- Disable build configuration updates that might trigger maven
+    target.settings = target.settings or {}
+    target.settings.java = target.settings.java or {}
+    target.settings.java.configuration = target.settings.java.configuration or {}
+    target.settings.java.configuration.updateBuildConfiguration = "disabled"
   end
 
   target.settings = vim.tbl_deep_extend("force", target.settings or {}, {
