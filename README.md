@@ -28,6 +28,31 @@ A Neovim plugin to automatically set up Bazel support for Java using `nvim-jdtls
 }
 ```
 
+### With LazyVim's `lang.java` extra
+
+LazyVim's `nvim-jdtls` spec builds its final `init_options.bundles`/`root_dir`/`settings`
+inside its own `config()` function, from a local variable it computes itself
+(mason's `java-debug-adapter`/`java-test` globs). It only merges in `opts.jdtls`
+right before starting the server, calling it as a function against the fully
+built config. Setting things directly on `opts` in your own `opts` function (as
+above) gets silently discarded, so wire `setup_jdtls` through `opts.jdtls`
+instead:
+
+```lua
+{
+  "Chazmus/bazel-java.nvim",
+},
+{
+  "mfussenegger/nvim-jdtls",
+  dependencies = { "Chazmus/bazel-java.nvim" },
+  opts = function(_, opts)
+    opts.jdtls = function(config)
+      return require("bazel-java").setup_jdtls(config)
+    end
+  end,
+}
+```
+
 ## Setup
 
 After installing the plugin, you need to download the required JARs by running:

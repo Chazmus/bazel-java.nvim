@@ -28,6 +28,25 @@ function M.get_bundles()
   return bundles
 end
 
+-- Jars that show up in mason glob results but aren't valid OSGi/Eclipse
+-- bundles. Feeding these to jdtls's bundle loader throws and aborts the
+-- *entire* batch load, taking down every other bundle in the same call
+-- (including the Bazel importer) -- so they must be filtered out whenever
+-- bundle lists get merged.
+M.invalid_bundle_patterns = {
+  "jacocoagent%.jar$",
+  "com%.microsoft%.java%.test%.runner%-jar%-with%-dependencies%.jar$",
+}
+
+local function is_valid_bundle(path)
+  for _, pattern in ipairs(M.invalid_bundle_patterns) do
+    if path:match(pattern) then
+      return false
+    end
+  end
+  return true
+end
+
 function M.setup_jdtls(opts)
   -- Support both LazyVim (opts.jdtls) and standard nvim-jdtls (opts)
   local target = opts.jdtls or opts
@@ -56,7 +75,18 @@ function M.setup_jdtls(opts)
       vim.notify("Bazel Java JARs not found. Please run :BazelJavaInstall", vim.log.levels.WARN)
     end
   else
-    -- Merge our bundles with any existing ones (like DAP/Test)
+    -- Merge our bundles with any existing ones (like DAP/Test), dropping any
+    -- jars that aren't valid Eclipse bundles (e.g. jacocoagent.jar) so a bad
+    -- jar in someone else's bundle list can't abort the whole batch load and
+    -- take the Bazel importer down with it.
+    local existing = {}
+    for _, bundle in ipairs(target.init_options.bundles) do
+      if is_valid_bundle(bundle) then
+        table.insert(existing, bundle)
+      end
+    end
+    target.init_options.bundles = existing
+
     for _, bundle in ipairs(bundles) do
       if not vim.tbl_contains(target.init_options.bundles, bundle) then
         table.insert(target.init_options.bundles, bundle)
@@ -88,20 +118,14 @@ function M.setup_jdtls(opts)
     import_settings.gradle = { enabled = false }
     vim.notify("[bazel-java] Disabled Maven and Gradle imports in jdtls settings", vim.log.levels.INFO)
 
-    -- Force the root_dir to the bazel workspace to prevent jdtls from anchoring to a pom.xml
+    -- Force the root_dir to the bazel workspace to prevent jdtls from anchoring to a pom.xml.
+    -- target.root_dir may already be a resolved string by this point (e.g. when
+    -- called via LazyVim's opts.jdtls hook, after opts.root_dir(fname) has run),
+    -- so assign the resolved bazel_root directly rather than wrapping it in a
+    -- function -- callers that only check truthiness (like nvim-jdtls's
+    -- start_or_attach) would otherwise use the function object itself as the path.
     if bazel_root then
-      local orig_root_dir = target.root_dir
-      target.root_dir = function(path)
-        -- Still allow dynamic resolution, but prioritize bazel markers
-        local root = vim.fs.root(path, markers)
-        if root then return root end
-        if type(orig_root_dir) == "function" then
-          return orig_root_dir(path)
-        elseif orig_root_dir then
-          return orig_root_dir
-        end
-        return bazel_root
-      end
+      target.root_dir = bazel_root
     end
 
     -- Disable build configuration updates that might trigger maven
@@ -158,6 +182,8 @@ function M.setup_jdtls(opts)
       end
     end,
   })
+
+  return target
 end
 
 return M

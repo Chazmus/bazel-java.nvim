@@ -21,3 +21,6 @@ bazel-bin/
 bazel-out/
 bazel-testlogs/
 bazel-external/
+bazel-*
+MODULE.bazel.lock
+.eclipse/
